@@ -1,4 +1,4 @@
-#include <blocking-server/Server.hpp>
+#include <non-blocking-server/Server.hpp>
 #include <sys/socket.h>
 #include <errno.h>
 #include <string.h>
@@ -89,6 +89,7 @@ void Server::init() {
                 std::cout << "Size of message received: " << msgSizeRec << "\n";
                 buffer[msgSizeRec] = '\0';
                 std::cout << "Message: " << buffer;
+
             }
 
             sendAllBytes(connectedSocketFileDescriptor, msgSizeRec, buffer);
