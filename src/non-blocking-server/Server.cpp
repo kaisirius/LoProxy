@@ -5,9 +5,8 @@
 #include <iostream>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 
-std::unique_ptr<Server> Server::serverInstance = nullptr;
-std::mutex Server::mtx;
 
 Server::Server() {
     // storing config - IPv4 address container
@@ -15,16 +14,6 @@ Server::Server() {
     addr.sin_port = htons(8080);
     inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
     
-}
-
-Server* Server::getInstance() {
-    if(serverInstance == nullptr) {
-        std::lock_guard<std::mutex> lock(mtx);
-        if(serverInstance == nullptr) {
-            serverInstance = std::unique_ptr<Server>(new Server());
-        }
-    }
-    return serverInstance.get();
 }
 
 void Server::init() {
@@ -37,6 +26,9 @@ void Server::init() {
         std::string err = strerror(errno);
         throw std::runtime_error(err);
     }
+
+    // making listening socket non blocking so that accept() is non blocking op
+    fcntl(fileDescriptor, F_SETFL, O_NONBLOCK);
 
     int opt = 1;
     int flag = setsockopt(fileDescriptor, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -64,20 +56,22 @@ void Server::init() {
 
 
     while(true) {
-        int connectedSocketFileDescriptor = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
+        int connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
 
-        if(connectedSocketFileDescriptor == -1) {
+        if(connectedSocketFD == -1) {
             throw std::runtime_error(strerror(errno));
         }
 
+        // making connected socket non blocking
+        fcntl(connectedSocketFD, F_SETFL, O_NONBLOCK);
         
-        std::cout << "CLient connected: " << connectedSocketFileDescriptor << "\n";
+        std::cout << "CLient connected: " << connectedSocketFD << "\n";
 
         // receiveing & sending message
         char buffer[17];
 
         while(true) {
-            ssize_t msgSizeRec = recv(connectedSocketFileDescriptor, &buffer, sizeof(buffer) - 1, 0);
+            ssize_t msgSizeRec = recv(connectedSocketFD, &buffer, sizeof(buffer) - 1, 0);
 
             if(msgSizeRec == -1) {
                 std::cerr << "[ERROR]: " << "Could not receive message." << "\n";
@@ -92,10 +86,10 @@ void Server::init() {
 
             }
 
-            sendAllBytes(connectedSocketFileDescriptor, msgSizeRec, buffer);
+            sendAllBytes(connectedSocketFD, msgSizeRec, buffer);
         }
 
-        close(connectedSocketFileDescriptor);
+        close(connectedSocketFD);
     }
 }
 

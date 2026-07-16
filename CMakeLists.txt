@@ -9,6 +9,7 @@ add_executable(loproxy
     src/main.cpp
     src/blocking-server/BlockingServer.cpp
     src/non-blocking-server/Server.cpp
+    src/engine/EpollEngine.cpp
 )   
 
 target_include_directories(loproxy PUBLIC ${CMAKE_SOURCE_DIR}/include)
