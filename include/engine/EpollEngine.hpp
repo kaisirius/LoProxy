@@ -12,13 +12,13 @@ class EpollEngine {
         int epollEngFD;
         uint32_t defaultEvents;
         std::set<int> registeredFDs;
+        epoll_event createTemplateEventStruct(int fileDescriptor);
         EpollEngine();
 
     public:
         EpollEngine(const EpollEngine& EpollEngine) = delete;
         EpollEngine& operator = (const EpollEngine& EpollEngine) = delete;
         static EpollEngine* getInstance();
-        epoll_event createTemplateEventStruct(int fileDescriptor);
         void addObserver(const int fileDescriptor);
         void removeObserver(const int fileDescriptor);
         void modifyObserver(const int fileDescriptor,const uint32_t events);

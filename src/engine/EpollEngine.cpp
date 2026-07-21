@@ -53,14 +53,14 @@ void EpollEngine::addObserver(const int fileDescriptor) {
         throw std::runtime_error(err);
     } else {
         registeredFDs.insert(fileDescriptor);
-        std::cout << "[LOG]: Socekt " << fileDescriptor << " " << "successfully added to epoll engine." << "\n";
+        std::cout << "[LOG]: Socket " << fileDescriptor << " " << "successfully added to epoll engine." << "\n";
     }
 }
 
 void EpollEngine::removeObserver(const int fileDescriptor) {
 
     if(registeredFDs.find(fileDescriptor) == registeredFDs.end()) {
-        std::cout << "[WARN]: Socekt " << fileDescriptor << " " << "does not exist in epoll engine. Nothing to delete." << "\n";
+        std::cout << "[WARN]: Socket " << fileDescriptor << " " << "does not exist in epoll engine. Nothing to delete." << "\n";
         return;
     }
 
@@ -70,7 +70,7 @@ void EpollEngine::removeObserver(const int fileDescriptor) {
         std::string err = strerror(errno);
         throw std::runtime_error(err);
     } else {
-        std::cout << "[LOG]: Socekt " << fileDescriptor << " " << "successfully removed from epoll engine." << "\n";
+        std::cout << "[LOG]: Socket " << fileDescriptor << " " << "successfully removed from epoll engine." << "\n";
     }
 }
 

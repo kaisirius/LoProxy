@@ -3,6 +3,7 @@
 int main() {
     Server* server = new Server();
     server->init();
+    server->runEventLoop();
     
     return 0;
 }
