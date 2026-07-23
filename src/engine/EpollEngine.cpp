@@ -7,10 +7,10 @@
 
 std::unique_ptr<EpollEngine> EpollEngine::epollEngInstance = nullptr;
 std::mutex EpollEngine::mtx;
+uint32_t EpollEngine::defaultEvents = EPOLLIN | EPOLLERR | EPOLLHUP;
 
 EpollEngine::EpollEngine() {
     epollEngFD = epoll_create1(0);
-    defaultEvents = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP;
 }
 
 
@@ -94,7 +94,7 @@ void EpollEngine::modifyObserver(const int fileDescriptor, const uint32_t events
     }
 }
 
-std::vector<epoll_event> EpollEngine::fetchReadySockets(int timeoutMs) {
+std::pair<std::vector<epoll_event>, int> EpollEngine::fetchReadySockets(int timeoutMs) {
     if(timeoutMs < 0) {
         // -1 will lead to infinite loop
         std::cout << "Invalid time in millisecond as an argument." << "\n";
@@ -105,9 +105,12 @@ std::vector<epoll_event> EpollEngine::fetchReadySockets(int timeoutMs) {
     std::vector<epoll_event> readySockets(1000, createTemplateEventStruct(-1));
 
     int numberOfReadySockets = epoll_wait(epollEngFD, &readySockets[0], 1000, timeoutMs);
-    return readySockets;
+    return {readySockets, numberOfReadySockets};
 }
 
+uint32_t EpollEngine::getDefaultEvents() {
+    return defaultEvents;
+}
 
 EpollEngine::~EpollEngine() {
     std::cout << "----------Stopping epoll engine----------" << "\n";

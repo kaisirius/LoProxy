@@ -1,5 +1,6 @@
 #include <non-blocking-server/Server.hpp>
 #include <engine/EpollEngine.hpp>
+#include <models/ConnectionState.hpp>
 #include <sys/socket.h>
 #include <errno.h>
 #include <string.h>
@@ -8,6 +9,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <vector>
+#include <string>
 
 Server::Server() {
     // storing config - IPv4 address container
@@ -66,58 +68,80 @@ void Server::init() {
 void Server::runEventLoop() {
 
     std::vector<epoll_event> readyEvents;
+    int numberOfReadySockets;
     while(true) {
-      readyEvents = EpollEngine::getInstance()->fetchReadySockets(fileDescriptor);  
-      for(const epoll_event event: readyEvents) {
-        handleEvent(event);
-      }
+        std::pair<std::vector<epoll_event>, int> res = EpollEngine::getInstance()->fetchReadySockets(fileDescriptor);  
+        readyEvents = res.first;
+        numberOfReadySockets = res.second;
+        if(numberOfReadySockets > 0) {
+            for(size_t i = 0; i < numberOfReadySockets; i++) {
+                handleEvent(readyEvents[i]);
+            }
+        }
     }
 }
-    //     // receiveing & sending message
-    //     char buffer[17];
-
-    //     while(true) {
-    //         ssize_t msgSizeRec = recv(connectedSocketFD, &buffer, sizeof(buffer) - 1, 0);
-
-    //         if(msgSizeRec == -1) {
-    //             std::cerr << "[ERROR]: " << "Could not receive message." << "\n";
-    //             throw std::runtime_error(strerror(errno));
-    //         } else if(msgSizeRec == 0) {
-    //             std::cout << "FIN received from client. Client disconnected." << "\n";
-    //             break;
-    //         }else {
-    //             std::cout << "Size of message received: " << msgSizeRec << "\n";
-    //             buffer[msgSizeRec] = '\0';
-    //             std::cout << "Message: " << buffer;
-
-    //         }
-
-    //         sendAllBytes(connectedSocketFD, msgSizeRec, buffer);
-    //     }
-
-    //     close(connectedSocketFD);
-    // }
-
 
 // echo "hello" | nc 127.0.0.1 8080
 
 void Server::handleEvent(const epoll_event event) {
-    
+
     if(event.data.fd == fileDescriptor) {
-        handleAcceptEvent();
+        if(event.events == EPOLLIN) {
+            handleAcceptEvent();
+        } else {
+            throw std::runtime_error("Listening socket internal error");
+        }
     } else {
-        // TODO
+        switch (event.events) 
+        {
+        case EPOLLIN: {
+            handleReadEvent(event.data.fd);
+            if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
+                EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT);
+            }
+            break;
+        }
+
+        default:
+            break;
+        }
     }
 }
 
 void Server::handleAcceptEvent() {
 
-    int connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);;
+    int32_t connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);;
     while(connectedSocketFD != -1) {
         fcntl(connectedSocketFD, F_SETFL, O_NONBLOCK);
+        connectedSockets.insert({connectedSocketFD, ConnectionState(connectedSocketFD)});
+        EpollEngine::getInstance()->addObserver(connectedSocketFD);
+
         std::cout << "CLient connected: " << connectedSocketFD << "\n";
 
         connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
+    }
+}
+
+void Server::handleReadEvent(const uint32_t connectedSocketFD) {
+    ConnectionState socketState = connectedSockets.at(connectedSocketFD);
+    // std::cout << "hj" << "\n";
+    ssize_t msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 4, 0);
+    
+    while(msgSizeRec != -1) {
+
+        if(msgSizeRec == 0) {
+            std::cout << "FIN received from client. Client: " <<  connectedSocketFD << " disconnected." << "\n";
+            shutdownConnection(connectedSocketFD);
+            break;
+        } 
+        socketState.getReadBuffer()[msgSizeRec] = '\0';
+
+        std::cout << "buffer mein kya aya " << socketState.getReadBuffer() << "kitna aya : " << msgSizeRec << "\n";
+        std::string data = socketState.getData();
+        data = data + socketState.getReadBuffer();
+        socketState.setData(data);
+
+        msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 4, 0);
     }
 }
 
@@ -137,7 +161,21 @@ void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, char buff[])
     }
 }
 
+void Server::shutdownAllConnections() {
+    for(auto &connection: connectedSockets) {
+        EpollEngine::getInstance()->removeObserver(connection.second.getConnectedSocketFD());
+        close(connection.second.getConnectedSocketFD());
+    }
+}
+
+void Server::shutdownConnection(const int fd) {
+    EpollEngine::getInstance()->removeObserver(fd);
+    close(fd);
+    connectedSockets.erase(fd);
+}
+
 Server::~Server() {
     std::cout << "Closing server..." << "\n";
+    shutdownAllConnections();
     close(fileDescriptor);
 }
