@@ -24,5 +24,12 @@ std::string ConnectionState::getData() {
 
 void ConnectionState::setData(const std::string updatedData) {
     data = updatedData;
-    std::cout << data;
+}
+
+void ConnectionState::setReadBuffer(const char buffer[1025]) {
+    strcpy(readBuffer, buffer);
+}
+
+void ConnectionState::setWriteBuffer(const char buffer[1025]) {
+    strcpy(writeBuffer, buffer);
 }

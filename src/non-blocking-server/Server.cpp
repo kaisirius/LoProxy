@@ -20,7 +20,7 @@ Server::Server() {
 }
 
 void Server::init() {
-    std::cout << "Starting server at 127.0.0.1" << "\n";
+    std::cout << "-----Starting server at 127.0.0.1-----" << "\n";
 
     fileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -62,7 +62,8 @@ void Server::init() {
         throw std::runtime_error(strerror(errno));
     }
     
-    std::cout << "Server started listening on port 8080, Ready to accept connections." << "\n";
+    std::cout << "-----Server started listening on port 8080, Ready to accept connections-----" << "\n";
+    std::cout << "=========================================" << "\n";
 } 
 
 void Server::runEventLoop() {
@@ -116,7 +117,7 @@ void Server::handleAcceptEvent() {
         connectedSockets.insert({connectedSocketFD, ConnectionState(connectedSocketFD)});
         EpollEngine::getInstance()->addObserver(connectedSocketFD);
 
-        std::cout << "CLient connected: " << connectedSocketFD << "\n";
+        std::cout << "[LOG]: CLient connected: " << connectedSocketFD << "\n";
 
         connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
     }
@@ -124,25 +125,25 @@ void Server::handleAcceptEvent() {
 
 void Server::handleReadEvent(const uint32_t connectedSocketFD) {
     ConnectionState socketState = connectedSockets.at(connectedSocketFD);
-    // std::cout << "hj" << "\n";
+    
     ssize_t msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 4, 0);
     
     while(msgSizeRec != -1) {
 
         if(msgSizeRec == 0) {
-            std::cout << "FIN received from client. Client: " <<  connectedSocketFD << " disconnected." << "\n";
+            std::cout << "[LOG]: FIN received from client. Client: " <<  connectedSocketFD << " disconnected." << "\n";
             shutdownConnection(connectedSocketFD);
             break;
         } 
         socketState.getReadBuffer()[msgSizeRec] = '\0';
 
-        std::cout << "buffer mein kya aya " << socketState.getReadBuffer() << "kitna aya : " << msgSizeRec << "\n";
         std::string data = socketState.getData();
         data = data + socketState.getReadBuffer();
         socketState.setData(data);
 
-        msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 4, 0);
+        msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
     }
+    std::cout << "[LOG]: Data received - " << socketState.getData();
 }
 
 void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, char buff[]) {
