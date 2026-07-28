@@ -93,18 +93,28 @@ void Server::handleEvent(const epoll_event event) {
             throw std::runtime_error("Listening socket internal error");
         }
     } else {
-        switch (event.events) 
-        {
-        case EPOLLIN: {
+
+        if(event.events & (EPOLLERR | EPOLLHUP)) {
+            shutdownConnection(event.data.fd);
+        } else if(event.events & EPOLLIN) {
             handleReadEvent(event.data.fd);
             if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
-                EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT);
+                // making connected socket available for writing and disabling read flag 
+                EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
+                // below step is just to act like a ping pong server, actual writeData will be updated from backend server's response
+                connectedSockets.at(event.data.fd).setWriteData(connectedSockets.at(event.data.fd).getReadData());
+                connectedSockets.at(event.data.fd).setReadData("");
             }
-            break;
-        }
+        } else if(event.events & EPOLLOUT) {
+            std::string dataToBeSent = connectedSockets.at(event.data.fd).getWriteData();
+            if((int)dataToBeSent.length() > 0) {
+                sendAllBytes(event.data.fd, dataToBeSent.length(), dataToBeSent);
 
-        default:
-            break;
+                EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents());
+
+                connectedSockets.at(event.data.fd).setWriteData("");
+                connectedSockets.at(event.data.fd).setReadData("");
+            }  
         }
     }
 }
@@ -124,9 +134,9 @@ void Server::handleAcceptEvent() {
 }
 
 void Server::handleReadEvent(const uint32_t connectedSocketFD) {
-    ConnectionState socketState = connectedSockets.at(connectedSocketFD);
+    ConnectionState& socketState = connectedSockets.at(connectedSocketFD);
     
-    ssize_t msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 4, 0);
+    ssize_t msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
     
     while(msgSizeRec != -1) {
 
@@ -137,25 +147,27 @@ void Server::handleReadEvent(const uint32_t connectedSocketFD) {
         } 
         socketState.getReadBuffer()[msgSizeRec] = '\0';
 
-        std::string data = socketState.getData();
+        std::string data = socketState.getReadData();
         data = data + socketState.getReadBuffer();
-        socketState.setData(data);
+        socketState.setReadData(data);
 
         msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
     }
-    std::cout << "[LOG]: Data received - " << socketState.getData();
+
+    if(connectedSockets.find(connectedSocketFD) != connectedSockets.end()) {
+        std::cout << "[LOG]: Data received - " << socketState.getReadData();
+    }
 }
 
-void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, char buff[]) {
-
+void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::string &data) {
     ssize_t totalBytesSent = 0;
     while(totalBytesSent != bytesToSend) {
-        int bytesSent = send(connectedSocket, buff + totalBytesSent, bytesToSend - totalBytesSent, 0);
+        int bytesSent = send(connectedSocket, &data[0] + totalBytesSent, bytesToSend - totalBytesSent, 0);
         if(bytesSent == -1) {
             std::cerr << "[ERROR]: " << "Could not send message." << "\n";
             throw std::runtime_error(strerror(errno));
         } else {
-            std::cout << "Size of message sent back: " << bytesSent << "\n";
+            std::cout << "[LOG]: Size of message sent back: " << bytesSent << "\n";
         }
 
         totalBytesSent += bytesSent;

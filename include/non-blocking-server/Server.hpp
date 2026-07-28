@@ -12,7 +12,7 @@ class Server {
         socklen_t addrLen;
         std::unordered_map<int, ConnectionState> connectedSockets;
 
-        void sendAllBytes(int connectedSocket, ssize_t bytesToSend, char buff[]);
+        void sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::string &data);
         void handleEvent(const epoll_event event);
         void handleAcceptEvent();
         void handleReadEvent(const uint32_t fd);

@@ -36,12 +36,12 @@ epoll_event EpollEngine::createTemplateEventStruct(int fileDescriptor) {
 void EpollEngine::addObserver(const int fileDescriptor) {
 
     if(registeredFDs.find(fileDescriptor) != registeredFDs.end()) {
-        std::cout << "[WARN]: Socekt " << fileDescriptor << " " << "already exists in epoll engine." << "\n";
+        std::cout << "[WARN]: Socket " << fileDescriptor << " " << "already exists in epoll engine." << "\n";
         return;
     }
 
     if(fileDescriptor == epollEngFD) {
-        std::cout << "[WARN]: Socekt " << fileDescriptor << " " << "is same as epoll engine's FD." << "\n";
+        std::cout << "[WARN]: Socket " << fileDescriptor << " " << "is same as epoll engine's FD." << "\n";
         return;
     }
     
@@ -70,6 +70,7 @@ void EpollEngine::removeObserver(const int fileDescriptor) {
         std::string err = strerror(errno);
         throw std::runtime_error(err);
     } else {
+        registeredFDs.erase(fileDescriptor);
         std::cout << "[LOG]: Socket " << fileDescriptor << " " << "successfully removed from epoll engine." << "\n";
     }
 }
@@ -77,7 +78,7 @@ void EpollEngine::removeObserver(const int fileDescriptor) {
 void EpollEngine::modifyObserver(const int fileDescriptor, const uint32_t events) {
 
     if(registeredFDs.find(fileDescriptor) == registeredFDs.end()) {
-        std::cout << "[WARN]: Socekt " << fileDescriptor << " " << "does not exist in epoll engine. Nothing to modify." << "\n";
+        std::cout << "[WARN]: Socket " << fileDescriptor << " " << "does not exist in epoll engine. Nothing to modify." << "\n";
         return;
     }
 
@@ -90,7 +91,7 @@ void EpollEngine::modifyObserver(const int fileDescriptor, const uint32_t events
         std::string err = strerror(errno);
         throw std::runtime_error(err);
     } else {
-        std::cout << "[LOG]: Socekt " << fileDescriptor << " " << "successfully modified in epoll engine." << "\n";
+        std::cout << "[LOG]: Socket " << fileDescriptor << " " << "successfully modified in epoll engine." << "\n";
     }
 }
 

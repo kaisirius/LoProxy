@@ -6,16 +6,16 @@
 class ConnectionState {
     private:
         int32_t connectedSocketFD;
-        char readBuffer[1025]; // restricting buffer size to avoid starvation for other sockets
-        char writeBuffer[1025];
-        std::string data;
+        char readBuffer[1025]; 
+        std::string readData;
+        std::string writeData;
     public:
         ConnectionState(const int32_t fd);
         char* getReadBuffer();
-        char* getWriteBuffer();
+        std::string getWriteData();
         int32_t getConnectedSocketFD();
-        std::string getData();
+        std::string getReadData();
         void setReadBuffer(const char buffer[1025]);
-        void setWriteBuffer(const char buffer[1025]);
-        void setData(const std::string updatedData);
+        void setWriteData(const std::string data);
+        void setReadData(const std::string updatedData);
 };

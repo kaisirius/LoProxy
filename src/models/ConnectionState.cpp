@@ -3,33 +3,34 @@
 
 ConnectionState::ConnectionState(const int32_t fd) {
     connectedSocketFD = fd;
-    data = "";
+    readData = "";
+    writeData = "";
 }
 
 char* ConnectionState::getReadBuffer() {
     return readBuffer;
 }
 
-char* ConnectionState::getWriteBuffer() {
-    return writeBuffer;
+std::string ConnectionState::getWriteData() {
+    return writeData;
 }
 
 int32_t ConnectionState::getConnectedSocketFD() {
     return connectedSocketFD;
 }
 
-std::string ConnectionState::getData() {
-    return data;
+std::string ConnectionState::getReadData() {
+    return readData;
 }
 
-void ConnectionState::setData(const std::string updatedData) {
-    data = updatedData;
+void ConnectionState::setReadData(const std::string updatedData) {
+    readData = updatedData;
 }
 
 void ConnectionState::setReadBuffer(const char buffer[1025]) {
     strcpy(readBuffer, buffer);
 }
 
-void ConnectionState::setWriteBuffer(const char buffer[1025]) {
-    strcpy(writeBuffer, buffer);
+void ConnectionState::setWriteData(const std::string data) {
+    writeData = data;
 }
