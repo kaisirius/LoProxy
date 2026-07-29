@@ -16,7 +16,7 @@ Server::Server() {
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8080);
     inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
-    socklen_t addrLen = sizeof(addr);
+    addrLen = sizeof(addr);
 }
 
 void Server::init() {
@@ -71,7 +71,7 @@ void Server::runEventLoop() {
     std::vector<epoll_event> readyEvents;
     int numberOfReadySockets;
     while(true) {
-        std::pair<std::vector<epoll_event>, int> res = EpollEngine::getInstance()->fetchReadySockets(fileDescriptor);  
+        std::pair<std::vector<epoll_event>, int> res = EpollEngine::getInstance()->fetchReadySockets(1000);  
         readyEvents = res.first;
         numberOfReadySockets = res.second;
         if(numberOfReadySockets > 0) {
@@ -87,7 +87,7 @@ void Server::runEventLoop() {
 void Server::handleEvent(const epoll_event event) {
 
     if(event.data.fd == fileDescriptor) {
-        if(event.events == EPOLLIN) {
+        if(event.events & EPOLLIN) {
             handleAcceptEvent();
         } else {
             throw std::runtime_error("Listening socket internal error");
@@ -152,6 +152,12 @@ void Server::handleReadEvent(const uint32_t connectedSocketFD) {
         socketState.setReadData(data);
 
         msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
+
+        if(msgSizeRec == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break; // expected, done reading
+            shutdownConnection(connectedSocketFD);              // real error
+            return;
+        }
     }
 
     if(connectedSockets.find(connectedSocketFD) != connectedSockets.end()) {
