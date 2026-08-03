@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string>
 #include <cstring>
+#include <http/HttpParser.hpp>
 
 class ConnectionState {
     private:
@@ -9,6 +10,8 @@ class ConnectionState {
         char readBuffer[1025]; 
         std::string readData;
         std::string writeData;
+        HttpParser httpParser;
+        
     public:
         ConnectionState(const int32_t fd);
         char* getReadBuffer();

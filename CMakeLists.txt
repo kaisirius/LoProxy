@@ -11,6 +11,12 @@ add_executable(loproxy
     src/non-blocking-server/Server.cpp
     src/engine/EpollEngine.cpp
     src/models/ConnectionState.cpp
+    src/http/HttpParser.cpp
+    src/http/ParseResult.cpp
+    src/state/ParseReqLineState.cpp
+    src/state/ParseHeaderState.cpp
+    src/state/ParseCompleteState.cpp
+    src/state/ParseBodyState.cpp
 )   
 
 target_include_directories(loproxy PUBLIC ${CMAKE_SOURCE_DIR}/include)
