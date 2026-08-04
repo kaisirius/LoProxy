@@ -1,1 +1,1 @@
-enum Status { INCOMPLETE, COMPLETE, ERROR };
+enum Status { COMPLETE, ERROR };
