@@ -34,3 +34,11 @@ void ConnectionState::setReadBuffer(const char buffer[1025]) {
 void ConnectionState::setWriteData(const std::string data) {
     writeData = data;
 }
+
+// testing purpose
+void ConnectionState::parseAndPrint() {
+    httpParser.parse(readData, 0);
+    std::cout <<"----- METHOD:" << httpParser.getParsedReqObj().method << "\n";
+    std::cout <<"----- URI:" << httpParser.getParsedReqObj().uri << "\n";
+    std::cout <<"----- VERSION:" << httpParser.getParsedReqObj().version << "\n";
+}

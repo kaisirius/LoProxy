@@ -102,6 +102,10 @@ void Server::handleEvent(const epoll_event event) {
                 // making connected socket available for writing and disabling read flag 
                 EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
                 // below step is just to act like a ping pong server, actual writeData will be updated from backend server's response
+
+                // testing parser
+                connectedSockets.at(event.data.fd).parseAndPrint();
+
                 connectedSockets.at(event.data.fd).setWriteData(connectedSockets.at(event.data.fd).getReadData());
                 connectedSockets.at(event.data.fd).setReadData("");
             }

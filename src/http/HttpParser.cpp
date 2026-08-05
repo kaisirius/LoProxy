@@ -11,4 +11,18 @@ void HttpParser::reset() {
     parsedReq.version = "";
     parsedReq.headers.clear();
     parsedReq.complete = false;
+
+    currentState = std::make_unique<ParseReqLineState>();
+}
+
+ParsedRequest HttpParser::getParsedReqObj() {
+    return parsedReq;
+}
+
+void HttpParser::setParsedReqMethod(std::string _method) {
+    this->parsedReq.method = _method;
+}
+
+void HttpParser::setParsedReqURI(std::string _uri) {
+    this->parsedReq.uri = _uri;
 }

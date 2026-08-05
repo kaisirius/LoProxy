@@ -21,4 +21,8 @@ class ConnectionState {
         void setReadBuffer(const char buffer[1025]);
         void setWriteData(const std::string data);
         void setReadData(const std::string updatedData);
+
+        // for testing purpose (partially created parser)
+        void parseAndPrint();
+
 };

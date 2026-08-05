@@ -5,3 +5,11 @@ ParseResult ParseHeaderState::handleHTTPparsing(const std::string& data, int sta
     ParseResult res(Status(COMPLETE), 0);
     return res;
 }
+
+bool ParseHeaderState::isExtractable() {
+    return true;
+}
+
+void ParseHeaderState::extractFromStreamedData(HttpParser* parser) {
+
+}
