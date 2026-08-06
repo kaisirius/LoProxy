@@ -13,12 +13,19 @@ ParseResult ParseReqLineState::handleHTTPparsing(const std::string& data, int st
         // ig no need to check for last to last character as \r
         if(streamedData[streamedData.length() - 1] == '\n') {
             if(isExtractable()) {
-                extractFromStreamedData(parser);
-                
-                parser->currentState = std::make_unique<ParseHeaderState>();
-                ParseResult nextStateRes = parser->currentState.get()->handleHTTPparsing(data, i + 1, parser); 
-                res.status = nextStateRes.status;
-                res.bytes_consumed += nextStateRes.bytes_consumed;
+                try {
+                    extractFromStreamedData(parser);
+
+                    parser->currentState = std::make_unique<ParseHeaderState>();
+                    ParseResult nextStateRes = parser->currentState.get()->handleHTTPparsing(data, i + 1, parser); 
+                    res.status = nextStateRes.status;
+                    res.bytes_consumed += nextStateRes.bytes_consumed;
+                } catch(const char* msg) {
+                    if(msg == "INVALID METHOD") {
+                        res.status = ERROR;
+                        parser->reset();
+                    }
+                }               
             } else {
                 res.status = ERROR;
                 parser->reset();
@@ -57,6 +64,6 @@ void ParseReqLineState::extractFromStreamedData(HttpParser* parser) {
         parser->setParsedReqMethod(_method);
         parser->setParsedReqURI(_uri);
     } else {
-        parser->reset();
+        throw "INVALID METHOD";
     }
  }
