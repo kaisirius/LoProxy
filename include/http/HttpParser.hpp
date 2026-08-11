@@ -15,6 +15,8 @@ class HttpParser {
         ParsedRequest getParsedReqObj();
         void setParsedReqMethod(std::string _method);
         void setParsedReqURI(std::string _uri);
+        void setParsedReqHeader(std::string key, std::string value);
+        void setParsedReqBody(std::string body);
         void reset();
 
 };

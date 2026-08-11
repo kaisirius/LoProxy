@@ -26,3 +26,11 @@ void HttpParser::setParsedReqMethod(std::string _method) {
 void HttpParser::setParsedReqURI(std::string _uri) {
     this->parsedReq.uri = _uri;
 }
+
+void HttpParser::setParsedReqHeader(std::string key, std::string value) {
+    this->parsedReq.headers[key] = value;
+}
+
+void HttpParser::setParsedReqBody(std::string body) {
+    this->parsedReq.body = body;
+}

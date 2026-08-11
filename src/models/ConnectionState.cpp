@@ -41,4 +41,9 @@ void ConnectionState::parseAndPrint() {
     std::cout <<"----- METHOD:" << httpParser.getParsedReqObj().method << "\n";
     std::cout <<"----- URI:" << httpParser.getParsedReqObj().uri << "\n";
     std::cout <<"----- VERSION:" << httpParser.getParsedReqObj().version << "\n";
+    std::cout <<"----- HEADERS:" << "\n";
+    for(auto it: httpParser.getParsedReqObj().headers) {
+        std::cout << it.first << ": " << it.second << "\n";
+    }
+    std::cout <<"----- BODY:" << httpParser.getParsedReqObj().body << "\n";
 }

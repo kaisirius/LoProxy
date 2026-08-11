@@ -2,7 +2,8 @@
 #include <state/IParserState.hpp>
 
 class ParseCompleteState : public IParserState {
-    ParseResult handleHTTPparsing(const std::string& data, int startIdx, HttpParser* parser);
-    bool isExtractable() override;
-    void extractFromStreamedData(HttpParser* parser) override;
+    public:
+        ParseResult handleHTTPparsing(const std::string& data, int startIdx, HttpParser* parser);
+        bool isExtractable() override;
+        void extractFromStreamedData(HttpParser* parser) override;
 };

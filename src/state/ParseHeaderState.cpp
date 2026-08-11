@@ -14,15 +14,21 @@ ParseResult ParseHeaderState::handleHTTPparsing(const std::string& data, int sta
         // two cases we signal end of headers either prev was \n or if no header no charac before \r
         int lenStreamed = streamedData.length();
         if((streamedData[lenStreamed - 1] == '\r' && lenStreamed == 1) || (streamedData[lenStreamed - 1] == '\r' && streamedData[lenStreamed - 2] == '\n')) {
+            streamedData += '\n';
+
             if(isExtractable()) {
                 extractFromStreamedData(parser);
+        
+                if((parser->getParsedReqObj().method == "POST" || parser->getParsedReqObj().method == "PUT") && parser->getParsedReqObj().headers.find("Content-Length") != parser->getParsedReqObj().headers.end()) {
                 
-                if(parser->getParsedReqObj().method == "POST" || parser->getParsedReqObj().method == "PUT") {
+                    ssize_t contentLength = std::stoi(parser->getParsedReqObj().headers.at("Content-Length"));
                     parser->currentState = std::make_unique<ParseBodyState>();
+                    parser->currentState->contentLength_ToParse = contentLength;
+
                 } else {
                     parser->currentState = std::make_unique<ParseCompleteState>();
                 }
-                ParseResult nextStateRes = parser->currentState.get()->handleHTTPparsing(data, i + 1, parser); 
+                ParseResult nextStateRes = parser->currentState.get()->handleHTTPparsing(data, i + 2, parser); // skipping \n charac
                 
                 res.status = nextStateRes.status;
                 res.bytes_consumed += nextStateRes.bytes_consumed;
@@ -43,5 +49,24 @@ bool ParseHeaderState::isExtractable() {
 }
 
 void ParseHeaderState::extractFromStreamedData(HttpParser* parser) {
-    
+    bool colonIterated = false;
+    std::string fieldKey = "", fieldValue = "";
+    for(size_t i = 0; i < (size_t)streamedData.length(); ++i) {
+        if(streamedData[i] == '\r') {
+            ++i; // loop's ++i will skip \n and goes to next header field starting point
+            colonIterated = false;
+            if(fieldKey != "") {
+                parser->setParsedReqHeader(fieldKey, fieldValue);
+            } 
+            fieldKey = "";
+            fieldValue = "";
+        } else if(streamedData[i] == ':') {
+          colonIterated = true;
+        } else if(streamedData[i] == ' ') {
+            continue;
+        } else {
+            if(!colonIterated) fieldKey += streamedData[i];
+            else fieldValue += streamedData[i];
+        }
+    }
 }
