@@ -5,7 +5,7 @@
 #include <iostream>
 
 ParseResult ParseReqLineState::handleHTTPparsing(const std::string& data, int startIdx, HttpParser* parser) {
-    ParseResult res(Status(COMPLETE), 0);
+    ParseResult res(Status(INCOMPLETE), 0);
 
     for(size_t i = startIdx; i < (size_t)data.length(); ++i) {
         streamedData += data[i];
@@ -21,7 +21,7 @@ ParseResult ParseReqLineState::handleHTTPparsing(const std::string& data, int st
                     res.status = nextStateRes.status;
                     res.bytes_consumed += nextStateRes.bytes_consumed;
                 } catch(const char* msg) {
-                    if(msg == "INVALID METHOD") {
+                    if(std::string(msg) == "INVALID METHOD") {
                         res.status = ERROR;
                         parser->reset();
                     }
@@ -60,7 +60,7 @@ void ParseReqLineState::extractFromStreamedData(HttpParser* parser) {
         }
     }
 
-    if(_method == "GET" | _method == "PUT" | _method == "POST" | _method == "DELETE") {
+    if(_method == "GET" || _method == "PUT" || _method == "POST" || _method == "DELETE") {
         parser->setParsedReqMethod(_method);
         parser->setParsedReqURI(_uri);
     } else {

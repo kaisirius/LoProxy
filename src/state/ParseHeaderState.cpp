@@ -5,7 +5,7 @@
 #include <regex>
 
 ParseResult ParseHeaderState::handleHTTPparsing(const std::string& data, int startIdx, HttpParser* parser) {
-    ParseResult res(Status(COMPLETE), 0);
+    ParseResult res(Status(INCOMPLETE), 0);
 
     for(size_t i = startIdx; i < (size_t)data.length(); ++i) {
         streamedData += data[i];
@@ -62,7 +62,7 @@ void ParseHeaderState::extractFromStreamedData(HttpParser* parser) {
             fieldValue = "";
         } else if(streamedData[i] == ':') {
           colonIterated = true;
-        } else if(streamedData[i] == ' ') {
+        } else if(streamedData[i] == ' ' && (int)fieldValue.length() == 0) { // only first ' ' to be skipped
             continue;
         } else {
             if(!colonIterated) fieldKey += streamedData[i];

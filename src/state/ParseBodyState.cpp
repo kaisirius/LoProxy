@@ -3,12 +3,13 @@
 #include <state/ParseCompleteState.hpp>
 
 ParseResult ParseBodyState::handleHTTPparsing(const std::string& data, int startIdx, HttpParser* parser) {
-    ParseResult res(Status(COMPLETE), 0);
+    ParseResult res(Status(INCOMPLETE), 0);
 
     int currentIdx = startIdx;
     while(contentLength_Parsed != contentLength_ToParse && currentIdx < (int)data.length()) {
         streamedData += data[currentIdx++];
         contentLength_Parsed++;
+        res.bytes_consumed++;
     }
     if(isExtractable()) { // unnecessary, just adding it for consistency in code design
         extractFromStreamedData(parser);
