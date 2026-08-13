@@ -13,6 +13,7 @@ add_executable(loproxy
     src/models/ConnectionState.cpp
     src/http/HttpParser.cpp
     src/http/ParseResult.cpp
+    src/http/HttpResponse.cpp
     src/state/ParseReqLineState.cpp
     src/state/ParseHeaderState.cpp
     src/state/ParseCompleteState.cpp

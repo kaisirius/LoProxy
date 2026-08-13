@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <vector>
 #include <string>
+#include <http/HttpResponse.hpp>
 
 Server::Server() {
     // storing config - IPv4 address container
@@ -101,12 +102,12 @@ void Server::handleEvent(const epoll_event event) {
             if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
                 // making connected socket available for writing and disabling read flag 
                 EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
-                // below step is just to act like a ping pong server, actual writeData will be updated from backend server's response
 
                 // testing parser
                 connectedSockets.at(event.data.fd).parseAndPrint();
 
-                connectedSockets.at(event.data.fd).setWriteData(connectedSockets.at(event.data.fd).getReadData());
+                // below step is just to act like a ping pong server, actual writeData will be updated from backend server's response
+                connectedSockets.at(event.data.fd).setWriteData(HttpResponse::ok_200("pong\n", "application/octet-stream"));
                 connectedSockets.at(event.data.fd).setReadData("");
             }
         } else if(event.events & EPOLLOUT) {
@@ -165,7 +166,7 @@ void Server::handleReadEvent(const uint32_t connectedSocketFD) {
     }
 
     if(connectedSockets.find(connectedSocketFD) != connectedSockets.end()) {
-        std::cout << "[LOG]: Data received - " << socketState.getReadData();
+        std::cout << "[LOG]: Data received - " << socketState.getReadData() << "\n";
     }
 }
 

@@ -1,4 +1,5 @@
 #include <http/HttpParser.hpp>
+#include <iostream>
 
 ParseResult HttpParser::parse(const std::string& data, int startIdx) {
     return currentState.get()->handleHTTPparsing(data, startIdx, this);

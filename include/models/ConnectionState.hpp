@@ -18,6 +18,11 @@ class ConnectionState {
         std::string getWriteData();
         int32_t getConnectedSocketFD();
         std::string getReadData();
+        std::string getParsedMethod();
+        std::string getParsedURI();
+        std::string getParsedBody();
+        std::unordered_map<std::string, std::string> getParsedHeaders();
+
         void setReadBuffer(const char buffer[1025]);
         void setWriteData(const std::string data);
         void setReadData(const std::string updatedData);

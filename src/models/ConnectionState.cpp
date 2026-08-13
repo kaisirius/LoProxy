@@ -23,6 +23,22 @@ std::string ConnectionState::getReadData() {
     return readData;
 }
 
+std::string ConnectionState::getParsedMethod() {
+    return httpParser.getParsedReqObj().method;
+}
+
+std::string ConnectionState::getParsedURI() {
+    return httpParser.getParsedReqObj().uri;
+}
+
+std::string ConnectionState::getParsedBody() {
+    return httpParser.getParsedReqObj().body;
+}
+
+std::unordered_map<std::string, std::string> ConnectionState::getParsedHeaders() {
+   return httpParser.getParsedReqObj().headers; 
+}
+
 void ConnectionState::setReadData(const std::string updatedData) {
     readData = updatedData;
 }
@@ -46,4 +62,4 @@ void ConnectionState::parseAndPrint() {
         std::cout << it.first << ": " << it.second << "\n";
     }
     std::cout <<"----- BODY:" << httpParser.getParsedReqObj().body << "\n";
-}
+}   
