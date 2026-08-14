@@ -99,16 +99,19 @@ void Server::handleEvent(const epoll_event event) {
             shutdownConnection(event.data.fd);
         } else if(event.events & EPOLLIN) {
             handleReadEvent(event.data.fd);
+
             if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
-                // making connected socket available for writing and disabling read flag 
-                EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
-
-                // testing parser
-                connectedSockets.at(event.data.fd).parseAndPrint();
-
-                // below step is just to act like a ping pong server, actual writeData will be updated from backend server's response
-                connectedSockets.at(event.data.fd).setWriteData(HttpResponse::ok_200("pong\n", "application/octet-stream"));
-                connectedSockets.at(event.data.fd).setReadData("");
+                ParseResult parseRes = connectedSockets.at(event.data.fd).parse();
+                
+                if(parseRes.status == COMPLETE) {
+                    // making connected socket available for writing and disabling read flag 
+                    EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
+                    connectedSockets.at(event.data.fd).setWriteData(HttpResponse::ok_200("pong\n", "application/octet-stream"));
+                    connectedSockets.at(event.data.fd).setReadData("");
+                } else if(parseRes.status == ERROR) {
+                    shutdownConnection(event.data.fd);
+                } 
+                
             }
         } else if(event.events & EPOLLOUT) {
             std::string dataToBeSent = connectedSockets.at(event.data.fd).getWriteData();

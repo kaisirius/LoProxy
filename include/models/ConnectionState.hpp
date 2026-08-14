@@ -28,6 +28,6 @@ class ConnectionState {
         void setReadData(const std::string updatedData);
 
         // for testing purpose (partially created parser)
-        void parseAndPrint();
+        ParseResult parse();
 
 };
