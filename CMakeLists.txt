@@ -10,7 +10,7 @@ add_executable(loproxy
     src/blocking-server/BlockingServer.cpp
     src/non-blocking-server/Server.cpp
     src/engine/EpollEngine.cpp
-    src/models/ConnectionState.cpp
+    src/models/proxy/ConnectionState.cpp
     src/http/HttpParser.cpp
     src/http/ParseResult.cpp
     src/http/HttpResponse.cpp

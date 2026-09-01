@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 #include <sys/epoll.h>
 #include <unordered_map>
-#include <models/ConnectionState.hpp>
+#include <models/proxy/ConnectionState.hpp>
 
 class Server {
     private:

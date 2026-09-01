@@ -1,6 +1,6 @@
 #include <non-blocking-server/Server.hpp>
 #include <engine/EpollEngine.hpp>
-#include <models/ConnectionState.hpp>
+#include <models/proxy/ConnectionState.hpp>
 #include <sys/socket.h>
 #include <errno.h>
 #include <string.h>
@@ -106,22 +106,22 @@ void Server::handleEvent(const epoll_event event) {
                 if(parseRes.status == COMPLETE) {
                     // making connected socket available for writing and disabling read flag 
                     EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
-                    connectedSockets.at(event.data.fd).setWriteData(HttpResponse::ok_200("pong\n", "application/octet-stream"));
-                    connectedSockets.at(event.data.fd).setReadData("");
+                    connectedSockets.at(event.data.fd).setUpstreamBuffer(HttpResponse::ok_200("pong\n", "application/octet-stream"));
+                    connectedSockets.at(event.data.fd).setClientBuffer("");
                 } else if(parseRes.status == ERROR) {
                     shutdownConnection(event.data.fd);
                 } 
                 
             }
         } else if(event.events & EPOLLOUT) {
-            std::string dataToBeSent = connectedSockets.at(event.data.fd).getWriteData();
+            std::string dataToBeSent = connectedSockets.at(event.data.fd).getUpstreamBuffer();
             if((int)dataToBeSent.length() > 0) {
                 sendAllBytes(event.data.fd, dataToBeSent.length(), dataToBeSent);
 
                 EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents());
 
-                connectedSockets.at(event.data.fd).setWriteData("");
-                connectedSockets.at(event.data.fd).setReadData("");
+                connectedSockets.at(event.data.fd).setUpstreamBuffer("");
+                connectedSockets.at(event.data.fd).setClientBuffer("");
             }  
         }
     }
@@ -155,9 +155,9 @@ void Server::handleReadEvent(const uint32_t connectedSocketFD) {
         } 
         socketState.getReadBuffer()[msgSizeRec] = '\0';
 
-        std::string data = socketState.getReadData();
+        std::string data = socketState.getClientBuffer();
         data = data + socketState.getReadBuffer();
-        socketState.setReadData(data);
+        socketState.setClientBuffer(data);
 
         msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
 
@@ -169,7 +169,7 @@ void Server::handleReadEvent(const uint32_t connectedSocketFD) {
     }
 
     if(connectedSockets.find(connectedSocketFD) != connectedSockets.end()) {
-        std::cout << "[LOG]: Data received - " << socketState.getReadData() << "\n";
+        std::cout << "[LOG]: Data received - " << socketState.getClientBuffer() << "\n";
     }
 }
 
