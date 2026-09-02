@@ -79,7 +79,11 @@ int32_t ConnectionState::connectUpstream(std::string &host, int32_t port) {
         fcntl(upstreamFD, F_SETFL, O_NONBLOCK); // non blocking ops
         //method - 1 (handles both type of hosts 127.0.0.1 & localhost/xyz) 
         addrinfo* result;
-        int status = getaddrinfo(host.c_str(), std::to_string(port).c_str(), nullptr, &result);
+        addrinfo hints{};
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+
+        int status = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result);
 
         // method - 2 (handles only hosts like 127.0.0.1)
         // sockaddr_in addr;
