@@ -9,6 +9,7 @@
 
 ConnectionState::ConnectionState(const int32_t fd) {
     connectedSocketFD = fd;
+    upstreamFD = -1;
     clientBuffer = "";
     upstreamBuffer = "";
 }
@@ -49,6 +50,10 @@ std::unordered_map<std::string, std::string> ConnectionState::getParsedHeaders()
    return httpParser.getParsedReqObj().headers; 
 }
 
+bool ConnectionState::getUpstreamConnectedFlag() {
+    return upstreamConnectedFlag;
+}
+
 void ConnectionState::setClientBuffer(const std::string updatedData) {
     clientBuffer = updatedData;
 }
@@ -63,6 +68,10 @@ void ConnectionState::setUpstreamBuffer(const std::string data) {
 
 void ConnectionState::setUpstreamConnectedFlag(bool flag) {
     upstreamConnectedFlag = flag;
+}
+
+void ConnectionState::setUpstreamFD(int32_t upstreamFD) {
+    this->upstreamFD = upstreamFD;
 }
 
 ParseResult ConnectionState::parse() {

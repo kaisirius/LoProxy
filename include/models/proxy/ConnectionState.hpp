@@ -25,11 +25,13 @@ class ConnectionState { // Proxy Session
         std::string getParsedURI();
         std::string getParsedBody();
         std::unordered_map<std::string, std::string> getParsedHeaders();
+        bool getUpstreamConnectedFlag();
 
         void setReadBuffer(const char buffer[1025]);
         void setUpstreamBuffer(const std::string data);
         void setClientBuffer(const std::string updatedData);
-        void setUpstreamConnectedFlag(bool flag);\
+        void setUpstreamConnectedFlag(bool flag);
+        void setUpstreamFD(int32_t upstreamFD);
         ParseResult parse();    
         int32_t connectUpstream(std::string& host, int32_t port);
         

@@ -60,7 +60,7 @@ class ConnectionState { // Proxy Session
 };
 
 int main() {
-    // throw away code
+    // throw away code, this test checks happy path and everything being resolved synchronously
     ConnectionState connState(123);
     std::string domain = "httpbin.org";
     int upstreamFD = connState.connectUpstream(domain, 80);

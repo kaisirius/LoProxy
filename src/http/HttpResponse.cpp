@@ -2,6 +2,7 @@
 
 std::string HttpResponse::CRLF = "\r\n";
 
+// below function is not needed as it won't be called in case of happy path, in case of some error we have different set of status codes to respond with from Reverse Proxy server
 std::string HttpResponse::ok_200(const std::string body, const std::string content_type) {
     return "HTTP/1.1 200 OK" + CRLF +  
         "Content-Type: " + content_type + CRLF + 

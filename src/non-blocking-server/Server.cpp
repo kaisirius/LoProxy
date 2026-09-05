@@ -93,36 +93,72 @@ void Server::handleEvent(const epoll_event event) {
         } else {
             throw std::runtime_error("Listening socket internal error");
         }
-    } else {
+    } else if(clientFDs.find(event.data.fd) != clientFDs.end()) {
+        // handling client FD
 
         if(event.events & (EPOLLERR | EPOLLHUP)) {
+            sendAllBytes(event.data.fd, (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
             shutdownConnection(event.data.fd);
         } else if(event.events & EPOLLIN) {
             handleReadEvent(event.data.fd);
 
             if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
-                ParseResult parseRes = connectedSockets.at(event.data.fd).parse();
+                ParseResult parseRes = connectedSockets.at(event.data.fd)->parse();
                 
                 if(parseRes.status == COMPLETE) {
-                    // making connected socket available for writing and disabling read flag 
-                    EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
-                    connectedSockets.at(event.data.fd).setUpstreamBuffer(HttpResponse::ok_200("pong\n", "application/octet-stream"));
-                    connectedSockets.at(event.data.fd).setClientBuffer("");
+                    // parsing done so now make upstream FD to be written (sockets are always ready to be written but gotta check whether connection to upstream done or not)
+                    int32_t upstreamFD = connectedSockets.at(event.data.fd)->getUpstreamFD();
+                    EpollEngine::getInstance()->modifyObserver(upstreamFD, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
                 } else if(parseRes.status == ERROR) {
+                    sendAllBytes(event.data.fd, (ssize_t)HttpResponse::bad_rquest_400().length(), HttpResponse::bad_rquest_400());
                     shutdownConnection(event.data.fd);
                 } 
                 
             }
         } else if(event.events & EPOLLOUT) {
-            std::string dataToBeSent = connectedSockets.at(event.data.fd).getUpstreamBuffer();
+            std::string dataToBeSent = connectedSockets.at(event.data.fd)->getUpstreamBuffer();
             if((int)dataToBeSent.length() > 0) {
                 sendAllBytes(event.data.fd, dataToBeSent.length(), dataToBeSent);
 
                 EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents());
 
-                connectedSockets.at(event.data.fd).setUpstreamBuffer("");
-                connectedSockets.at(event.data.fd).setClientBuffer("");
+                connectedSockets.at(event.data.fd)->setUpstreamBuffer("");
+                connectedSockets.at(event.data.fd)->setClientBuffer("");
             }  
+        }
+    } else {
+        // Handling upstream FD
+        if(event.events & (EPOLLERR | EPOLLHUP)) {
+            sendAllBytes(connectedSockets.at(event.data.fd)->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
+            shutdownConnection(connectedSockets.at(event.data.fd)->getConnectedSocketFD());
+        } else if(event.events & EPOLLIN) {
+            handleUpstreamReadEvent(event.data.fd);
+
+            if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
+                int32_t clientFD = connectedSockets.at(event.data.fd)->getConnectedSocketFD();
+                EpollEngine::getInstance()->modifyObserver(clientFD, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
+            }
+        } else if(event.events & EPOLLOUT) {
+            if(!connectedSockets.at(event.data.fd)->getUpstreamConnectedFlag()) {
+                int error = -1;
+                socklen_t errorlen = sizeof(error);
+                getsockopt(connectedSockets.at(event.data.fd)->getUpstreamFD(), SOL_SOCKET, SO_ERROR, &error, &errorlen);
+                if(error != 0) {
+                    // connection not succeeded
+                    sendAllBytes(connectedSockets.at(event.data.fd)->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
+                    shutdownConnection(connectedSockets.at(event.data.fd)->getConnectedSocketFD());
+                }
+                connectedSockets.at(event.data.fd)->setUpstreamConnectedFlag(true);
+            }
+            
+            std::string dataToBeSent = connectedSockets.at(event.data.fd)->getClientBuffer();
+            if((int)dataToBeSent.length() > 0) {
+                sendAllBytes(event.data.fd, dataToBeSent.length(), dataToBeSent);
+                EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents());
+            } else {
+                sendAllBytes(connectedSockets.at(event.data.fd)->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_rquest_400().length(), HttpResponse::bad_rquest_400());
+                shutdownConnection(connectedSockets.at(event.data.fd)->getConnectedSocketFD());
+            }
         }
     }
 }
@@ -132,44 +168,93 @@ void Server::handleAcceptEvent() {
     int32_t connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);;
     while(connectedSocketFD != -1) {
         fcntl(connectedSocketFD, F_SETFL, O_NONBLOCK);
-        connectedSockets.insert({connectedSocketFD, ConnectionState(connectedSocketFD)});
+        std::shared_ptr<ConnectionState> socketState= std::make_shared<ConnectionState>(connectedSocketFD);
+        connectedSockets.insert({connectedSocketFD, socketState});
+        clientFDs.insert(connectedSocketFD);
         EpollEngine::getInstance()->addObserver(connectedSocketFD);
 
         std::cout << "[LOG]: CLient connected: " << connectedSocketFD << "\n";
+
+        std::string domain = "127.0.0.1";
+        int upstreamFD = socketState->connectUpstream(domain, 3000);
+        if(upstreamFD == -1) {
+            shutdownConnection(connectedSocketFD);
+        } else {
+            socketState->setUpstreamFD(upstreamFD);
+            connectedSockets.insert({upstreamFD, socketState});
+            EpollEngine::getInstance()->addObserver(upstreamFD);
+            std::cout << "[LOG]: Upstream connection instantiated: " << upstreamFD << "\n";
+        }  
 
         connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
     }
 }
 
-void Server::handleReadEvent(const uint32_t connectedSocketFD) {
-    ConnectionState& socketState = connectedSockets.at(connectedSocketFD);
+void Server::handleReadEvent(const int32_t connectedSocketFD) {
+    std::shared_ptr<ConnectionState> socketState = connectedSockets.at(connectedSocketFD);
     
-    ssize_t msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
+    ssize_t msgSizeRec = recv(connectedSocketFD, socketState->getReadBuffer(), 1024, 0);
     
     while(msgSizeRec != -1) {
 
         if(msgSizeRec == 0) {
             std::cout << "[LOG]: FIN received from client. Client: " <<  connectedSocketFD << " disconnected." << "\n";
+            
             shutdownConnection(connectedSocketFD);
             break;
         } 
-        socketState.getReadBuffer()[msgSizeRec] = '\0';
+        socketState->getReadBuffer()[msgSizeRec] = '\0';
 
-        std::string data = socketState.getClientBuffer();
-        data = data + socketState.getReadBuffer();
-        socketState.setClientBuffer(data);
+        std::string data = socketState->getClientBuffer();
+        data = data + socketState->getReadBuffer();
+        socketState->setClientBuffer(data);
 
-        msgSizeRec = recv(connectedSocketFD, socketState.getReadBuffer(), 1024, 0);
+        msgSizeRec = recv(connectedSocketFD, socketState->getReadBuffer(), 1024, 0);
 
         if(msgSizeRec == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) break; // expected, done reading
-            shutdownConnection(connectedSocketFD);              // real error
+            sendAllBytes(connectedSocketFD, (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
+            shutdownConnection(connectedSocketFD); // real error
             return;
         }
     }
 
     if(connectedSockets.find(connectedSocketFD) != connectedSockets.end()) {
-        std::cout << "[LOG]: Data received - " << socketState.getClientBuffer() << "\n";
+        std::cout << "[LOG]: Data received - " << socketState->getClientBuffer() << "\n";
+    }
+}
+
+void Server::handleUpstreamReadEvent(const int32_t upstreamFD) {
+    std::shared_ptr<ConnectionState> socketState = connectedSockets.at(upstreamFD);
+    
+    ssize_t msgSizeRec = recv(upstreamFD, socketState->getReadBuffer(), 1024, 0);
+    
+    while(msgSizeRec != -1) {
+
+        if(msgSizeRec == 0) {
+            std::cout << "[LOG]: FIN received from upstream. Upstream: " <<  upstreamFD << " disconnected." << "\n";
+            // sendAllBytes(socketState->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
+            // shutdownConnection(socketState->getConnectedSocketFD());
+            break;
+        } 
+        socketState->getReadBuffer()[msgSizeRec] = '\0';
+
+        std::string data = socketState->getUpstreamBuffer();
+        data = data + socketState->getReadBuffer();
+        socketState->setUpstreamBuffer(data);
+
+        msgSizeRec = recv(upstreamFD, socketState->getReadBuffer(), 1024, 0);
+
+        if(msgSizeRec == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break; // expected, done reading
+            sendAllBytes(socketState->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
+            shutdownConnection(socketState->getConnectedSocketFD());              // real error
+            return;
+        }
+    }
+
+    if(connectedSockets.find(upstreamFD) != connectedSockets.end()) {
+        std::cout << "[LOG]: Data received - " << socketState->getUpstreamBuffer() << "\n";
     }
 }
 
@@ -181,7 +266,7 @@ void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::s
             std::cerr << "[ERROR]: " << "Could not send message." << "\n";
             throw std::runtime_error(strerror(errno));
         } else {
-            std::cout << "[LOG]: Size of message sent back: " << bytesSent << "\n";
+            std::cout << "[LOG]: Size of message sent: " << bytesSent << "\n";
         }
 
         totalBytesSent += bytesSent;
@@ -190,15 +275,22 @@ void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::s
 
 void Server::shutdownAllConnections() {
     for(auto &connection: connectedSockets) {
-        EpollEngine::getInstance()->removeObserver(connection.second.getConnectedSocketFD());
-        close(connection.second.getConnectedSocketFD());
+        EpollEngine::getInstance()->removeObserver(connection.second->getConnectedSocketFD());
+        close(connection.second->getConnectedSocketFD());
     }
 }
 
 void Server::shutdownConnection(const int fd) {
     EpollEngine::getInstance()->removeObserver(fd);
+    
+    std::shared_ptr<ConnectionState> socketState = connectedSockets.at(fd);
+    if(socketState->getUpstreamFD() != -1) {
+        EpollEngine::getInstance()->removeObserver(socketState->getUpstreamFD());
+        close(socketState->getUpstreamFD());
+    }
     close(fd);
     connectedSockets.erase(fd);
+    clientFDs.erase(fd);
 }
 
 Server::~Server() {
