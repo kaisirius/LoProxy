@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <http/HttpResponse.hpp>
+#include <netdb.h>
 
 Server::Server() {
     // storing config - IPv4 address container
@@ -108,7 +109,7 @@ void Server::handleEvent(const epoll_event event) {
                 if(parseRes.status == COMPLETE) {
                     // parsing done so now make upstream FD to be written (sockets are always ready to be written but gotta check whether connection to upstream done or not)
                     int32_t upstreamFD = connectedSockets.at(event.data.fd)->getUpstreamFD();
-                    EpollEngine::getInstance()->modifyObserver(upstreamFD, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
+                    EpollEngine::getInstance()->modifyObserver(upstreamFD, (EpollEngine::getDefaultEvents() ^ EPOLLIN) | EPOLLOUT);
                 } else if(parseRes.status == ERROR) {
                     sendAllBytes(event.data.fd, (ssize_t)HttpResponse::bad_rquest_400().length(), HttpResponse::bad_rquest_400());
                     shutdownConnection(event.data.fd);
@@ -124,7 +125,8 @@ void Server::handleEvent(const epoll_event event) {
 
                 connectedSockets.at(event.data.fd)->setUpstreamBuffer("");
                 connectedSockets.at(event.data.fd)->setClientBuffer("");
-            }  
+                // shutdownConnection(event.data.fd);
+            } 
         }
     } else {
         // Handling upstream FD
@@ -134,9 +136,10 @@ void Server::handleEvent(const epoll_event event) {
         } else if(event.events & EPOLLIN) {
             handleUpstreamReadEvent(event.data.fd);
 
-            if(connectedSockets.find(event.data.fd) != connectedSockets.end()) {
+            if(connectedSockets.find(event.data.fd) != connectedSockets.end() && connectedSockets.at(event.data.fd)->getUpstreamFD() == -1) {
                 int32_t clientFD = connectedSockets.at(event.data.fd)->getConnectedSocketFD();
-                EpollEngine::getInstance()->modifyObserver(clientFD, EpollEngine::getDefaultEvents() | EPOLLOUT ^ EPOLLIN);
+                EpollEngine::getInstance()->modifyObserver(clientFD, (EpollEngine::getDefaultEvents() ^ EPOLLIN) | EPOLLOUT );
+                connectedSockets.erase(event.data.fd);
             }
         } else if(event.events & EPOLLOUT) {
             if(!connectedSockets.at(event.data.fd)->getUpstreamConnectedFlag()) {
@@ -147,6 +150,7 @@ void Server::handleEvent(const epoll_event event) {
                     // connection not succeeded
                     sendAllBytes(connectedSockets.at(event.data.fd)->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
                     shutdownConnection(connectedSockets.at(event.data.fd)->getConnectedSocketFD());
+                    return;
                 }
                 connectedSockets.at(event.data.fd)->setUpstreamConnectedFlag(true);
             }
@@ -155,9 +159,6 @@ void Server::handleEvent(const epoll_event event) {
             if((int)dataToBeSent.length() > 0) {
                 sendAllBytes(event.data.fd, dataToBeSent.length(), dataToBeSent);
                 EpollEngine::getInstance()->modifyObserver(event.data.fd, EpollEngine::getDefaultEvents());
-            } else {
-                sendAllBytes(connectedSockets.at(event.data.fd)->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_rquest_400().length(), HttpResponse::bad_rquest_400());
-                shutdownConnection(connectedSockets.at(event.data.fd)->getConnectedSocketFD());
             }
         }
     }
@@ -176,7 +177,8 @@ void Server::handleAcceptEvent() {
         std::cout << "[LOG]: CLient connected: " << connectedSocketFD << "\n";
 
         std::string domain = "127.0.0.1";
-        int upstreamFD = socketState->connectUpstream(domain, 3000);
+        int upstreamFD = connectUpstream(domain, 3000);
+
         if(upstreamFD == -1) {
             shutdownConnection(connectedSocketFD);
         } else {
@@ -194,7 +196,11 @@ void Server::handleReadEvent(const int32_t connectedSocketFD) {
     std::shared_ptr<ConnectionState> socketState = connectedSockets.at(connectedSocketFD);
     
     ssize_t msgSizeRec = recv(connectedSocketFD, socketState->getReadBuffer(), 1024, 0);
-    
+    if(msgSizeRec == -1) {
+        if(errno == EAGAIN || errno == EWOULDBLOCK) return;
+        shutdownConnection(connectedSocketFD);
+        return;
+    }
     while(msgSizeRec != -1) {
 
         if(msgSizeRec == 0) {
@@ -220,7 +226,7 @@ void Server::handleReadEvent(const int32_t connectedSocketFD) {
     }
 
     if(connectedSockets.find(connectedSocketFD) != connectedSockets.end()) {
-        std::cout << "[LOG]: Data received - " << socketState->getClientBuffer() << "\n";
+        std::cout << "[LOG]: Data received from client - " << socketState->getClientBuffer() << "\n";
     }
 }
 
@@ -228,13 +234,18 @@ void Server::handleUpstreamReadEvent(const int32_t upstreamFD) {
     std::shared_ptr<ConnectionState> socketState = connectedSockets.at(upstreamFD);
     
     ssize_t msgSizeRec = recv(upstreamFD, socketState->getReadBuffer(), 1024, 0);
-    
+    if(msgSizeRec == -1) {
+        if(errno == EAGAIN || errno == EWOULDBLOCK) return;
+        shutdownConnection(socketState->getConnectedSocketFD());
+        return;
+    }
     while(msgSizeRec != -1) {
 
         if(msgSizeRec == 0) {
             std::cout << "[LOG]: FIN received from upstream. Upstream: " <<  upstreamFD << " disconnected." << "\n";
-            // sendAllBytes(socketState->getConnectedSocketFD(), (ssize_t)HttpResponse::bad_gateway_502().length(), HttpResponse::bad_gateway_502());
-            // shutdownConnection(socketState->getConnectedSocketFD());
+            EpollEngine::getInstance()->removeObserver(upstreamFD);
+            socketState->setUpstreamFD(-1);
+            close(upstreamFD);
             break;
         } 
         socketState->getReadBuffer()[msgSizeRec] = '\0';
@@ -253,8 +264,13 @@ void Server::handleUpstreamReadEvent(const int32_t upstreamFD) {
         }
     }
 
+    if(msgSizeRec != 0) {
+        std::cout << "---INCOMPLETE DATA FROM UPSTREAM (NO FIN)---" << "\n";
+    } else if(msgSizeRec == 0) {
+        std::cout << "---COMPLETE DATA FROM UPSTREAM---" << "\n";
+    }
     if(connectedSockets.find(upstreamFD) != connectedSockets.end()) {
-        std::cout << "[LOG]: Data received - " << socketState->getUpstreamBuffer() << "\n";
+        std::cout << "[LOG]: Data received from upstream - " << socketState->getUpstreamBuffer() << "\n";
     }
 }
 
@@ -273,6 +289,48 @@ void Server::sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::s
     }
 }
 
+int32_t Server::connectUpstream(std::string &host, int32_t port) {
+    std::cout << "[LOG]: Creating upstream socket to connect with backend" << "\n";
+
+    int32_t upstreamFD = socket(AF_INET, SOCK_STREAM, 0);
+    if(upstreamFD == -1) {
+        std::cout << "[ERROR]: Internal server error while creating upstream socket." << "\n";
+    } else {
+        fcntl(upstreamFD, F_SETFL, O_NONBLOCK); // non blocking ops
+        //method - 1 (handles both type of hosts 127.0.0.1 & localhost/xyz) 
+        addrinfo* result;
+        addrinfo hints{};
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+
+        int status = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result);
+
+        // method - 2 (handles only hosts like 127.0.0.1)
+        // sockaddr_in addr;
+        // socklen_t addrLen;
+        // addr.sin_family = AF_INET;
+        // addr.sin_port = htons(8080);
+        // inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+
+        if(status != 0) { // Address resolution error
+            close(upstreamFD); // will close the FD since we can't resolve our connection and still return -1 as system failure
+            std::cout << "[ERROR]: DNS Resolution failed." << "\n";
+            return -1;
+        }
+        int upstreamConnectionStatus = connect(upstreamFD, result->ai_addr, result->ai_addrlen);
+        
+        if(upstreamConnectionStatus == -1 && errno != EINPROGRESS) {
+            close(upstreamFD); // will close the FD since we can't resolve our connection and still return -1 as system failure
+            std::cout << "[ERROR]: Connection to upstream failed." << "\n";
+            freeaddrinfo(result);
+            return -1;
+        }
+        freeaddrinfo(result);
+    }
+
+    return upstreamFD; // if returned -1 will catch it in server's event loop
+}
+
 void Server::shutdownAllConnections() {
     for(auto &connection: connectedSockets) {
         EpollEngine::getInstance()->removeObserver(connection.second->getConnectedSocketFD());
@@ -281,16 +339,20 @@ void Server::shutdownAllConnections() {
 }
 
 void Server::shutdownConnection(const int fd) {
-    EpollEngine::getInstance()->removeObserver(fd);
-    
     std::shared_ptr<ConnectionState> socketState = connectedSockets.at(fd);
-    if(socketState->getUpstreamFD() != -1) {
+
+    int32_t upstreamFD = socketState->getUpstreamFD();
+
+    if(upstreamFD != -1) {
         EpollEngine::getInstance()->removeObserver(socketState->getUpstreamFD());
+        connectedSockets.erase(upstreamFD);
         close(socketState->getUpstreamFD());
     }
-    close(fd);
+
+    EpollEngine::getInstance()->removeObserver(fd);
     connectedSockets.erase(fd);
     clientFDs.erase(fd);
+    close(fd);
 }
 
 Server::~Server() {

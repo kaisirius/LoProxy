@@ -21,6 +21,7 @@ class Server {
         void handleUpstreamReadEvent(const int32_t fd);
         void shutdownAllConnections();
         void shutdownConnection(const int fd);
+        int32_t connectUpstream(std::string& host, int32_t port);
     public: 
         Server();
         void init();

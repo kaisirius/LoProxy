@@ -33,6 +33,5 @@ class ConnectionState { // Proxy Session
         void setUpstreamConnectedFlag(bool flag);
         void setUpstreamFD(int32_t upstreamFD);
         ParseResult parse();    
-        int32_t connectUpstream(std::string& host, int32_t port);
         
 };
