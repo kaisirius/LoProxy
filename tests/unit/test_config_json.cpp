@@ -6,7 +6,9 @@ TEST_CASE("Valid JSON config parsing") {
     Config config = Config::load("./config/config.json");
     REQUIRE(config.listeningHost == "127.0.0.1");
     REQUIRE(config.listeningPort == 8080);
-    REQUIRE(config.upstreams.size() >= 0);
+    REQUIRE(config.upstreams.size() == 3);
+    REQUIRE(config.upstreams[0].host == "127.0.0.1");
+    REQUIRE(config.upstreams[0].port == 3001);
 }
 
 

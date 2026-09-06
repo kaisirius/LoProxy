@@ -11,16 +11,16 @@ int main() {
         std::unique_ptr<Server> server = std::make_unique<Server>(config);
         server.get()->init();
         server.get()->runEventLoop();
-        
+
     } catch(json::parse_error err) {
         std::cerr << "[ERROR]: Parsing error due to invalid JSON format." << "\n";  
-        throw std::runtime_error(err.what());
+        std::cerr << err.what() << "\n";
     } catch(json::out_of_range err) {
         std::cerr << "[ERROR]: Parsing error due to missing key." << "\n";  
-        throw std::runtime_error(err.what());
+        std::cerr << err.what() << "\n";
     } catch(json::type_error err) {
         std::cerr << "[ERROR]: Parsing error due to type mismatch in config file." << "\n";  
-        throw std::runtime_error(err.what());
+        std::cerr << err.what() << "\n";
     }
     
     
