@@ -13,7 +13,11 @@
 #include <http/HttpResponse.hpp>
 #include <netdb.h>
 
-Server::Server() {
+Server::Server(Config config) {
+    std::cout << config.listeningHost << "\n";
+    std::cout << config.listeningPort << "\n";
+    std::cout << config.lbStrategy << "\n";
+    std::cout << "1st upstream: " << config.upstreams[0].host << " " << config.upstreams[0].port << "\n";
     // storing config - IPv4 address container
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8080);
@@ -125,7 +129,6 @@ void Server::handleEvent(const epoll_event event) {
 
                 connectedSockets.at(event.data.fd)->setUpstreamBuffer("");
                 connectedSockets.at(event.data.fd)->setClientBuffer("");
-                // shutdownConnection(event.data.fd);
             } 
         }
     } else {

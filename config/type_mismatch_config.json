@@ -1,6 +1,6 @@
 {  
     "listen_host": "127.0.0.1",
-    "listen_port": 8080,
+    "listen_port": "8080",
     "lb_strategy": "round_robin",
     "upstreams": [
     { "host": "127.0.0.1", "port": 3001 },

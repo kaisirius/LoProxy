@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <models/proxy/ConnectionState.hpp>
+#include <config/Config.hpp>
 
 class Server {
     private:
@@ -23,7 +24,7 @@ class Server {
         void shutdownConnection(const int fd);
         int32_t connectUpstream(std::string& host, int32_t port);
     public: 
-        Server();
+        Server(Config config);
         void init();
         void runEventLoop();
         ~Server();
