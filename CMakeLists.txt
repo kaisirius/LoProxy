@@ -30,6 +30,8 @@ add_executable(loproxy
     src/state/ParseCompleteState.cpp
     src/state/ParseBodyState.cpp
     src/config/Config.cpp
+    src/lb/LoadBalancer.cpp
+    src/lb/RoundRobin.cpp
 )
 
 target_include_directories(loproxy PUBLIC ${CMAKE_SOURCE_DIR}/include)
@@ -93,3 +95,19 @@ target_link_libraries(test_config_json
     nlohmann_json::nlohmann_json
 )
 
+add_executable(test_round_robin
+    tests/unit/test_round_robin.cpp
+
+    src/lb/LoadBalancer.cpp
+    src/lb/RoundRobin.cpp
+)
+
+target_include_directories(test_round_robin
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+target_link_libraries(test_round_robin
+    PRIVATE
+    Catch2::Catch2WithMain
+)

@@ -168,8 +168,8 @@ void Server::handleEvent(const epoll_event event) {
 }
 
 void Server::handleAcceptEvent() {
-
-    int32_t connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);;
+    
+    int32_t connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
     while(connectedSocketFD != -1) {
         fcntl(connectedSocketFD, F_SETFL, O_NONBLOCK);
         std::shared_ptr<ConnectionState> socketState= std::make_shared<ConnectionState>(connectedSocketFD);
@@ -183,6 +183,7 @@ void Server::handleAcceptEvent() {
         int upstreamFD = connectUpstream(domain, 3000);
 
         if(upstreamFD == -1) {
+            sendAllBytes(connectedSocketFD, (ssize_t)HttpResponse::service_unavailable_503().length(), HttpResponse::service_unavailable_503());
             shutdownConnection(connectedSocketFD);
         } else {
             socketState->setUpstreamFD(upstreamFD);
