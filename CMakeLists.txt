@@ -130,3 +130,5 @@ target_link_libraries(test_least_conn
     PRIVATE
     Catch2::Catch2WithMain
 )
+
+add_executable(fast_backend tests/scratch/fast_backend.cpp)

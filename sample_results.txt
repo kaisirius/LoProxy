@@ -1,0 +1,27 @@
+50 concurrent connections
+
+=== Benchmark: 4 threads, 50 concurrent connections, 30 seconds ===
+Running 30s test @ http://localhost:8080/
+  4 threads and 50 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    21.10ms  109.96ms   1.68s    97.01%
+    Req/Sec   483.87    210.21     1.18k    68.41%
+  56356 requests in 30.02s, 4.57MB read
+  Socket errors: connect 0, read 0, write 0, timeout 3
+Requests/sec:   1877.28
+Transfer/sec:    155.83KB
+
+
+
+100 concurrent connections
+
+=== Benchmark: 4 threads, 100 concurrent connections, 30 seconds ===
+Running 30s test @ http://localhost:8080/
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    18.77ms   78.20ms   1.67s    96.79%
+    Req/Sec   427.05    191.57     1.19k    68.60%
+  50682 requests in 30.02s, 102.61MB read
+  Socket errors: connect 0, read 0, write 0, timeout 18
+Requests/sec:   1688.10
+Transfer/sec:      3.42MB
