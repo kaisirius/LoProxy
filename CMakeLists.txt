@@ -33,6 +33,7 @@ add_executable(loproxy
     src/lb/LoadBalancer.cpp
     src/lb/RoundRobin.cpp
     src/lb/LeastConn.cpp
+    src/models/lb/HealthChecker.cpp
 )
 
 target_include_directories(loproxy PUBLIC ${CMAKE_SOURCE_DIR}/include)

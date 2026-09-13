@@ -36,6 +36,9 @@ Server::Server(Config config) {
         throw std::runtime_error("Invalid load balancing strategy");
     }
 
+    healthChecker = new HealthChecker(upstreamServers, 2);
+    healthChecker->start();
+
     // storing config - IPv4 address container
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8080);
@@ -392,10 +395,12 @@ void Server::shutdownConnection(const int fd) {
 
 Server::~Server() {
     std::cout << "Closing server..." << "\n";
+    healthChecker->stop();
     shutdownAllConnections();
     close(fileDescriptor);
     for(int i = 0 ; i < (int)upstreamServers.size(); i++) {
         delete upstreamServers[i];
     }
     delete lb;
+    delete healthChecker;
 }

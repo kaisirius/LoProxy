@@ -7,6 +7,7 @@
 #include <models/proxy/ConnectionState.hpp>
 #include <config/Config.hpp>
 #include <lb/LoadBalancer.hpp>
+#include <models/lb/HealthChecker.hpp>
 
 class Server {
     private:
@@ -17,6 +18,7 @@ class Server {
         std::unordered_map<int32_t, std::shared_ptr<ConnectionState>> connectedSockets; // keyed with clientFD an upstreamFD
         LoadBalancer* lb = nullptr;
         std::vector<UpstreamServer*> upstreamServers;
+        HealthChecker* healthChecker;
 
         void sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::string &data);
         void handleEvent(const epoll_event event);
