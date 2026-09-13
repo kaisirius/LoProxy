@@ -6,11 +6,11 @@ class LoadBalancer {
 public:
     virtual ~LoadBalancer() = default;
     virtual UpstreamServer* selectBackend() = 0;
-    virtual void onConnectionClosed(const UpstreamServer server) {}
-    std::vector<UpstreamServer>& getUpstreamBackends() {
+    virtual void onConnectionClosed(UpstreamServer* server) {}
+    std::vector<UpstreamServer*> getUpstreamBackends() {
         return backends;
     }
 protected:
-    std::vector<UpstreamServer>& backends;
-    LoadBalancer(std::vector<UpstreamServer> &backends);
+    std::vector<UpstreamServer*> backends;
+    LoadBalancer(std::vector<UpstreamServer*> backends);
 };

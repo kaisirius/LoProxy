@@ -50,6 +50,10 @@ std::unordered_map<std::string, std::string> ConnectionState::getParsedHeaders()
    return httpParser.getParsedReqObj().headers; 
 }
 
+UpstreamServer* ConnectionState::getUpstreamServer() {
+    return upstreamServer;
+}
+
 bool ConnectionState::getUpstreamConnectedFlag() {
     return upstreamConnectedFlag;
 }
@@ -72,6 +76,10 @@ void ConnectionState::setUpstreamConnectedFlag(bool flag) {
 
 void ConnectionState::setUpstreamFD(int32_t upstreamFD) {
     this->upstreamFD = upstreamFD;
+}
+
+void ConnectionState::setUpstreamServer(UpstreamServer* server) {
+    upstreamServer = server;
 }
 
 ParseResult ConnectionState::parse() {

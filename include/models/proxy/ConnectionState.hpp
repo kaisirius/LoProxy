@@ -3,6 +3,7 @@
 #include <string>
 #include <cstring>
 #include <http/HttpParser.hpp>
+#include <models/lb/UpstreamServer.hpp>
 
 class ConnectionState { // Proxy Session
     private:
@@ -13,6 +14,7 @@ class ConnectionState { // Proxy Session
         std::string upstreamBuffer;
         HttpParser httpParser;
         bool upstreamConnectedFlag = false;
+        UpstreamServer* upstreamServer = nullptr;
 
     public:
         ConnectionState(const int32_t fd);
@@ -26,12 +28,14 @@ class ConnectionState { // Proxy Session
         std::string getParsedBody();
         std::unordered_map<std::string, std::string> getParsedHeaders();
         bool getUpstreamConnectedFlag();
+        UpstreamServer* getUpstreamServer();
 
         void setReadBuffer(const char buffer[1025]);
         void setUpstreamBuffer(const std::string data);
         void setClientBuffer(const std::string updatedData);
         void setUpstreamConnectedFlag(bool flag);
         void setUpstreamFD(int32_t upstreamFD);
+        void setUpstreamServer(UpstreamServer* server);
         ParseResult parse();    
         
 };

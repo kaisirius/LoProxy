@@ -12,12 +12,30 @@
 #include <string>
 #include <http/HttpResponse.hpp>
 #include <netdb.h>
+#include <lb/RoundRobin.hpp>
+#include <lb/LeastConn.hpp>
 
 Server::Server(Config config) {
     std::cout << config.listeningHost << "\n";
     std::cout << config.listeningPort << "\n";
     std::cout << config.lbStrategy << "\n";
-    std::cout << "1st upstream: " << config.upstreams[0].host << " " << config.upstreams[0].port << "\n";
+    
+    upstreamServers.resize((size_t)config.upstreams.size());
+    for(ssize_t i = 0; i < (ssize_t)config.upstreams.size(); i++) {
+        upstreamServers[i] = new UpstreamServer();
+        upstreamServers[i]->host = config.upstreams[i].host;
+        upstreamServers[i]->port = config.upstreams[i].port;
+    }
+
+    // better to have a factory to avoid OCP violation but deliberately leaving that part as of now 
+    if(config.lbStrategy == "round_robin") {
+        lb = new RoundRobin(upstreamServers);
+    } else if(config.lbStrategy == "least_connections") {
+        lb = new LeastConn(upstreamServers);
+    } else {
+        throw std::runtime_error("Invalid load balancing strategy");
+    }
+
     // storing config - IPv4 address container
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8080);
@@ -179,18 +197,26 @@ void Server::handleAcceptEvent() {
 
         std::cout << "[LOG]: CLient connected: " << connectedSocketFD << "\n";
 
-        std::string domain = "127.0.0.1";
-        int upstreamFD = connectUpstream(domain, 3000);
-
-        if(upstreamFD == -1) {
+        UpstreamServer* upstreamServer = lb->selectBackend();
+        if(upstreamServer == nullptr) {
             sendAllBytes(connectedSocketFD, (ssize_t)HttpResponse::service_unavailable_503().length(), HttpResponse::service_unavailable_503());
             shutdownConnection(connectedSocketFD);
         } else {
-            socketState->setUpstreamFD(upstreamFD);
-            connectedSockets.insert({upstreamFD, socketState});
-            EpollEngine::getInstance()->addObserver(upstreamFD);
-            std::cout << "[LOG]: Upstream connection instantiated: " << upstreamFD << "\n";
-        }  
+            int upstreamFD = connectUpstream(upstreamServer->host, upstreamServer->port);
+
+            if(upstreamFD == -1) {
+                lb->onConnectionClosed(upstreamServer);
+                sendAllBytes(connectedSocketFD, (ssize_t)HttpResponse::service_unavailable_503().length(), HttpResponse::service_unavailable_503());
+                shutdownConnection(connectedSocketFD);
+            } else {
+                socketState->setUpstreamServer(upstreamServer);
+                socketState->setUpstreamFD(upstreamFD);
+                connectedSockets.insert({upstreamFD, socketState});
+                EpollEngine::getInstance()->addObserver(upstreamFD);
+                std::cout << "[LOG]: Upstream connection instantiated: " << upstreamFD << "\n";
+            }  
+        }
+        
 
         connectedSocketFD = accept(fileDescriptor, reinterpret_cast<sockaddr*>(&addr), &addrLen);
     }
@@ -337,6 +363,10 @@ int32_t Server::connectUpstream(std::string &host, int32_t port) {
 
 void Server::shutdownAllConnections() {
     for(auto &connection: connectedSockets) {
+        if(connection.second->getUpstreamFD() != -1) {
+            EpollEngine::getInstance()->removeObserver(connection.second->getUpstreamFD());
+            close(connection.second->getUpstreamFD());
+        }
         EpollEngine::getInstance()->removeObserver(connection.second->getConnectedSocketFD());
         close(connection.second->getConnectedSocketFD());
     }
@@ -349,6 +379,7 @@ void Server::shutdownConnection(const int fd) {
 
     if(upstreamFD != -1) {
         EpollEngine::getInstance()->removeObserver(socketState->getUpstreamFD());
+        lb->onConnectionClosed(socketState->getUpstreamServer());
         connectedSockets.erase(upstreamFD);
         close(socketState->getUpstreamFD());
     }
@@ -363,4 +394,8 @@ Server::~Server() {
     std::cout << "Closing server..." << "\n";
     shutdownAllConnections();
     close(fileDescriptor);
+    for(int i = 0 ; i < (int)upstreamServers.size(); i++) {
+        delete upstreamServers[i];
+    }
+    delete lb;
 }

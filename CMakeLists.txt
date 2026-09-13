@@ -32,6 +32,7 @@ add_executable(loproxy
     src/config/Config.cpp
     src/lb/LoadBalancer.cpp
     src/lb/RoundRobin.cpp
+    src/lb/LeastConn.cpp
 )
 
 target_include_directories(loproxy PUBLIC ${CMAKE_SOURCE_DIR}/include)
@@ -108,6 +109,23 @@ target_include_directories(test_round_robin
 )
 
 target_link_libraries(test_round_robin
+    PRIVATE
+    Catch2::Catch2WithMain
+)
+
+add_executable(test_least_conn
+    tests/unit/test_least_conn.cpp
+
+    src/lb/LoadBalancer.cpp
+    src/lb/LeastConn.cpp
+)
+
+target_include_directories(test_least_conn
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+target_link_libraries(test_least_conn
     PRIVATE
     Catch2::Catch2WithMain
 )

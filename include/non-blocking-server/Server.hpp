@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <models/proxy/ConnectionState.hpp>
 #include <config/Config.hpp>
+#include <lb/LoadBalancer.hpp>
 
 class Server {
     private:
@@ -14,6 +15,8 @@ class Server {
         socklen_t addrLen;
         std::unordered_set<int32_t> clientFDs;
         std::unordered_map<int32_t, std::shared_ptr<ConnectionState>> connectedSockets; // keyed with clientFD an upstreamFD
+        LoadBalancer* lb = nullptr;
+        std::vector<UpstreamServer*> upstreamServers;
 
         void sendAllBytes(int connectedSocket, ssize_t bytesToSend, const std::string &data);
         void handleEvent(const epoll_event event);

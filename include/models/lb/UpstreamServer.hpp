@@ -6,5 +6,5 @@ struct UpstreamServer {
     std::string host;
     int32_t port;
     std::atomic<bool> isHealthy = true;
-    int activeConnections = 0;
+    std::atomic<int> activeConnections = 0;
 };
